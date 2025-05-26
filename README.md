@@ -1,11 +1,11 @@
 <div align="center">
-  <h1>Voy</h1>
-  <strong>A WASM vector similarity search engine written in Rust</strong>
+  <h1>better-Voy</h1>
+  <strong>A better WASM vector similarity search engine written in Rust</strong>
 </div>
+<br/>
 
 ![voy: a vector similarity search engine in WebAssembly][demo]
 
-[![npm version](https://badge.fury.io/js/voy-search.svg)](https://badge.fury.io/js/voy-search)
 
 - **Tiny**: 75KB gzipped, 69KB brotli.
 - **Fast**: Create the best search experience for the users. Voy uses [k-d tree][k-d-tree] to index and provide fast search
@@ -13,17 +13,7 @@
 - **Resumable**: Generate portable embeddings index anywhere, anytime.
 - **Worldwide**: Designed to deploy and run on CDN edge servers.
 
-> **🚜 Work in Progress**
->
-> Voy is under active development. As a result, the API is not stable. Please be aware that there might be breaking changes before the upcoming 1.0 release.
->
-> A sneak peek of what we are working on:
->
-> - [ ] Built-in text transformation in WebAssembly: As of now, voy relies on JavaScript libraries like [`transformers.js`][transformers.js] to generate text embeddings. See [Usage](#usage) for more detail.
-> - [x] Index update: Currently it's required to [re-build the index](#indexresource-resource-serializedindex) when a resource update occurs.
-> - [x] TypeScript support: Due to the limitation of WASM tooling, complex data types are not auto-generated.
-
-## Installation
+## Installation - legacy voy (will be replaced with better-voy later)
 
 ```bash
 # with npm
@@ -249,41 +239,7 @@ type SerializedIndex = string;
 
 As of now, voy relies on libraries like [`transformers.js`][transformers.js] and [`web-ai`][web-ai] to generate embeddings for text:
 
-```js
-import { TextModel } from "@visheratin/web-ai";
 
-const { Voy } = await import("voy-search");
-
-const phrases = [
-  "That is a very happy Person",
-  "That is a Happy Dog",
-  "Today is a sunny day",
-];
-const query = "That is a happy person";
-
-// Create text embeddings
-const model = await (await TextModel.create("gtr-t5-quant")).model;
-const processed = await Promise.all(phrases.map((q) => model.process(q)));
-
-// Index embeddings with voy
-const data = processed.map(({ result }, i) => ({
-  id: String(i),
-  title: phrases[i],
-  url: `/path/${i}`,
-  embeddings: result,
-}));
-const resource = { embeddings: data };
-const index = new Voy(resource);
-
-// Perform similarity search for a query embeddings
-const q = await model.process(query);
-const result = index.search(q.result, 1);
-
-// Display search result
-result.neighbors.forEach((result) =>
-  console.log(`✨ voy similarity search result: "${result.title}"`)
-);
-```
 
 ### Multiple Indexes
 
@@ -314,25 +270,8 @@ const indexB = new Voy(resourceB);
 ```
 
 ## License
-
-Licensed under either of
-
-- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
 - MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
-at your option.
-
-## Sponsor
-
-<a href="https://reflect.app" target="_blank"><img src="https://avatars.githubusercontent.com/u/73365487?s=64&v=4"></a>
-<a href="https://github.com/markhughes" target="_blank"><img src="https://avatars.githubusercontent.com/u/1357323?s=64&v=4"></a>
-
-### Contribution
-
-Unless you explicitly state otherwise, any contribution intentionally
-submitted for inclusion in the work by you, as defined in the Apache-2.0
-license, shall be dual licensed as above, without any additional terms or
-conditions.
 
 [demo]: ./voy.gif "voy demo"
 [web-ai]: https://github.com/visheratin/web-ai
