@@ -4,9 +4,6 @@ use crate::{engine, Neighbor, NumberOfResult, Query, Resource, SearchResult, Ser
 use js_sys::{Function, Object, Reflect};
 use wasm_bindgen::prelude::*;
 
-// ──────────────── Lifecycle‑hook support ───────────────────────────────
-/// Optional callbacks that JavaScript can provide. Every field is an
-/// optional `Function`; when present it is invoked at the matching stage.
 pub struct Options {
     pub on_init: Option<Function>,
     pub on_index: Option<Function>,
@@ -50,8 +47,7 @@ pub struct Voy {
 
 #[wasm_bindgen]
 impl Voy {
-    /// Construct a new Voy instance with an optional Resource to pre‑index
-    /// and an optional `options` object that may contain lifecycle callbacks.
+
     #[wasm_bindgen(constructor)]
     pub fn new(resource: Option<Resource>, options: Option<Object>) -> Voy {
         set_panic_hook();
@@ -67,7 +63,6 @@ impl Voy {
         Voy { index, options: opts }
     }
 
-    // ────────────── serialization helpers ────────────────────────────
     pub fn serialize(&self) -> SerializedIndex {
         if let Some(cb) = self.options.as_ref().and_then(|o| o.on_serialize.as_ref()) {
             cb.call0(&JsValue::UNDEFINED).ok();
@@ -87,7 +82,6 @@ impl Voy {
         Voy { index, options: opts }
     }
 
-    // ─────────────── mutating operations ─────────────────────────────
     pub fn index(&mut self, resource: Resource) {
         self.index = engine::index(resource).unwrap();
         if let Some(cb) = self.options.as_ref().and_then(|o| o.on_index.as_ref()) {
@@ -116,7 +110,6 @@ impl Voy {
         }
     }
 
-    // ─────────────── queries & metrics ───────────────────────────────
     pub fn search(&self, query: Query, k: NumberOfResult) -> SearchResult {
         let q: engine::Query = engine::Query::Embeddings(query);
         let neighbors_raw = engine::search(&self.index, &q, k).unwrap();
@@ -132,7 +125,6 @@ impl Voy {
         SearchResult { neighbors }
     }
 
-    /// Return the current number of embeddings stored.
     pub fn size(&self) -> usize {
         engine::size(&self.index)
     }
