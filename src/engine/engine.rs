@@ -13,6 +13,13 @@ pub struct Document {
     pub url: String,
 }
 
+// New struct to include the similarity score
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SearchResult {
+    pub document: Document,
+    pub similarity_score: f32, // Using f32 for the score
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Query {
     // TODO: support query in string
@@ -39,10 +46,10 @@ pub fn index(resource: Resource) -> anyhow::Result<Index> {
     let data_vec: Vec<(u64, Document)> = resource
         .embeddings
         .iter()
-        .map(|resource| Document {
-            id: resource.id.to_owned(),
-            title: resource.title.to_owned(),
-            url: resource.url.to_owned(),
+        .map(|resource_item| Document {
+            id: resource_item.id.to_owned(),
+            title: resource_item.title.to_owned(),
+            url: resource_item.url.to_owned(),
         })
         .map(|document| (hash(&document), document))
         .collect();
@@ -55,37 +62,45 @@ pub fn index(resource: Resource) -> anyhow::Result<Index> {
         .embeddings
         .iter()
         .zip(data_vec.iter())
-        .for_each(|(resource, data)| {
-            let mut embeddings = resource.embeddings.clone();
+        .for_each(|(resource_item, data_entry)| {
+            let mut embeddings = resource_item.embeddings.clone();
             embeddings.resize(768, 0.0);
 
-            let query: &[f32; 768] = &embeddings.try_into().unwrap();
-            // "item" holds the position of the document in "data"
-            tree.add(query, data.0);
+            let query_embedding: &[f32; 768] = &embeddings.try_into().unwrap_or_else(|_| panic!("Failed to convert embeddings to fixed size array during indexing for ID: {}", resource_item.id));
+            tree.add(query_embedding, data_entry.0);
         });
 
     Ok(Index { tree, data })
 }
 
-pub fn search<'a>(index: &'a Index, query: &'a Query, k: usize) -> anyhow::Result<Vec<Document>> {
-    let mut query: Vec<f32> = match query {
+// Modified search function to return Vec<SearchResult>
+pub fn search<'a>(index: &'a Index, query: &'a Query, k: usize) -> anyhow::Result<Vec<SearchResult>> {
+    let mut query_vec: Vec<f32> = match query {
         Query::Embeddings(q) => q.to_owned(),
     };
-    query.resize(768, 0.0);
+    query_vec.resize(768, 0.0);
 
-    let query: &[f32; 768] = &query.try_into().unwrap();
-    let neighbors = index.tree.nearest_n(query, k, &squared_euclidean);
+    let query_embedding: &[f32; 768] = &query_vec.try_into().unwrap_or_else(|_| panic!("Failed to convert query embeddings to fixed size array during search."));
+    // The `nearest_n` method returns a Vec of `NearestNeighbour` structs,
+    // which include `distance` and `item`.
+    let neighbors = index.tree.nearest_n(query_embedding, k, &squared_euclidean);
 
-    let mut result: Vec<Document> = vec![];
+    let mut results: Vec<SearchResult> = vec![];
 
     for neighbor in &neighbors {
         let doc = index.data.get(&neighbor.item);
         if let Some(document) = doc {
-            result.push(document.to_owned());
+            // The `neighbor.distance` is the squared Euclidean distance.
+            let similarity_score = 1.0 / (1.0 + neighbor.distance); // Or any other transformation
+
+            results.push(SearchResult {
+                document: document.to_owned(),
+                similarity_score,
+            });
         }
     }
 
-    Ok(result)
+    Ok(results)
 }
 
 pub fn add<'a>(index: &'a mut Index, resource: &'a Resource) {
@@ -93,15 +108,15 @@ pub fn add<'a>(index: &'a mut Index, resource: &'a Resource) {
         let mut embeddings = item.embeddings.clone();
         embeddings.resize(768, 0.0);
 
-        let query: &[f32; 768] = &embeddings.try_into().unwrap();
+        let query_embedding: &[f32; 768] = &embeddings.try_into().unwrap_or_else(|_| panic!("Failed to convert embeddings to fixed size array during add for ID: {}", item.id));
         let doc = Document {
             id: item.id.to_owned(),
             title: item.title.to_owned(),
             url: item.url.to_owned(),
         };
-        let id = hash(&doc);
-        index.data.insert(id, doc);
-        index.tree.add(query, id);
+        let id_hash = hash(&doc);
+        index.data.insert(id_hash, doc);
+        index.tree.add(query_embedding, id_hash);
     }
 }
 
@@ -110,15 +125,19 @@ pub fn remove<'a>(index: &'a mut Index, resource: &'a Resource) {
         let mut embeddings = item.embeddings.clone();
         embeddings.resize(768, 0.0);
 
-        let query: &[f32; 768] = &embeddings.try_into().unwrap();
-        let id = hash(&Document {
+        let query_embedding: &[f32; 768] = &embeddings.try_into().unwrap_or_else(|_| panic!("Failed to convert embeddings to fixed size array during remove for ID: {}", item.id));
+        let id_hash = hash(&Document {
             id: item.id.to_owned(),
             title: item.title.to_owned(),
             url: item.url.to_owned(),
         });
 
-        index.tree.remove(query, id);
-        index.data.remove(&id);
+        // Look into Note: Kiddo's remove might not be perfectly efficient or might have limitations
+        // for removing by value if multiple items have the exact same embedding.
+        // However, removing by (embedding, item_id) should be specific.
+        // The current API `tree.remove(&[f32; K], item: B)` seems to require both.
+        index.tree.remove(query_embedding, id_hash);
+        index.data.remove(&id_hash);
     }
 }
 
