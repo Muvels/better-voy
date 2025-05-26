@@ -37,7 +37,6 @@ fn reify(js_options: Option<Object>) -> Option<Options> {
         on_deserialize: get_fn("onDeserialize", &obj),
     })
 }
-// ───────────────────────────────────────────────────────────────────────
 
 #[wasm_bindgen]
 pub struct Voy {
