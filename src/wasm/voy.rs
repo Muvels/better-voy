@@ -111,10 +111,18 @@ impl Voy {
 
     pub fn search(&self, query: Query, k: NumberOfResult) -> SearchResult {
         let q: engine::Query = engine::Query::Embeddings(query);
-        let neighbors_raw = engine::search(&self.index, &q, k).unwrap();
-        let neighbors: Vec<Neighbor> = neighbors_raw
+        // Assuming engine::search now returns Vec<engine::SearchResultItem>
+        // where engine::SearchResultItem { document: engine::Document, similarity_score: f32 }
+        let core_search_results = engine::search(&self.index, &q, k).unwrap();
+
+        let neighbors: Vec<Neighbor> = core_search_results
             .into_iter()
-            .map(|n| Neighbor { id: n.id, title: n.title, url: n.url })
+            .map(|item_with_score| Neighbor { // item_with_score is an engine::SearchResultItem
+                id: item_with_score.document.id,
+                title: item_with_score.document.title,
+                url: item_with_score.document.url,
+                similarity_score: item_with_score.similarity_score, // Pass the score
+            })
             .collect();
 
         if let Some(cb) = self.options.as_ref().and_then(|o| o.on_search.as_ref()) {
