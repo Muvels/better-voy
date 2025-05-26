@@ -30,6 +30,7 @@ pub struct Neighbor {
     pub id: String,
     pub title: String,
     pub url: String,
+    pub similarity_score: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Tsify)]
