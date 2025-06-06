@@ -1,9 +1,9 @@
 [package]
-name = "voy-search"
-version = "0.6.3"
-authors = ["Daw-Chih Liou <dawochih.liou@gmail.com>"]
+name = "better-voy"
+version = "0.1.0"
+authors = ["Matteo Marolt <maroltmatteo@gmail.com>", "Daw-Chih Liou <dawochih.liou@gmail.com>"]
 edition = "2018"
-description = "a vector similarity search engine in WASM"
+description = "a better vector similarity search engine in WASM"
 documentation = "https://github.com/tantaraio/voy#readme"
 readme = "https://github.com/tantaraio/voy#readme"
 homepage = "https://github.com/tantaraio/voy"
