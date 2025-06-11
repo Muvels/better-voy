@@ -1,111 +1,123 @@
-import Head from "next/head";
+'use client';                                 // ⬅️ 1. keep this on the client
 
-import styles from "@/styles/Home.module.css";
+import Head from 'next/head';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import styles from '@/styles/Home.module.css';
+import { NavigationBar } from '@/components/NavigationBar';
+import { useVoy } from '@/context/VoyContext';
 
-import { NavigationBar } from "@/components/NavigationBar";
-import { useVoy } from "@/context/VoyContext";
-
-import { TextModel } from "@visheratin/web-ai";
+import { TextModel, type TextModelRunner } from '@visheratin/web-ai';
 
 const phrases = [
-  "That is a very happy Person",
-  "That is a Happy Dog",
-  "Today is a sunny day",
-  "Yesterday is a sunny day",
+  'That is a very happy Person',
+  'That is a Happy Dog',
+  'Today is a sunny day',
+  'Yesterday is a sunny day',
 ];
 
-export default function ServerSide() {
-  const voy = useVoy();
-  const [index, setIndex] = useState<string | null>(null);
-
+export default function ClientSideVoyDemo() {
+  /* ------------------------------------------------------------------ */
+  /*  HOOKS / STATE                                                     */
+  /* ------------------------------------------------------------------ */
+  const voy = useVoy();                       // ready – provider waits for it
+  const [model, setModel] = useState<TextModelRunner | null>(null);
   const [results, setResults] = useState<any[]>([]);
-
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [model, setModel] = useState<any>(null);
-
+  /* ------------------------------------------------------------------ */
+  /*  1)  LOAD THE TEXT-EMBEDDING MODEL (ONCE)                          */
+  /* ------------------------------------------------------------------ */
   useEffect(() => {
-    (async () => {
-      if (!model) {
-        const modelName = "gtr-t5-quant";
-
-        console.log("Loading model: ", modelName);
-
-        // Create text embeddings
-        const model = await (await TextModel.create(modelName)).model;
-        setModel(model);
-      }
-    })();
-  }, [model, setModel]);
-
-  useEffect(() => {
-    if (!model) return;
+    if (model) return;                        // already loaded
 
     (async () => {
-      console.log("Creating embeddings for ", phrases);
-      console.log("Processing for model", model);
+      const modelName = 'gtr-t5-quant';
+      console.log('Loading model:', modelName);
 
-      const processed = await Promise.all(phrases.map((q) => model.process(q)));
-
-      // Index embeddings with voy
-      const data = processed.map(({ result }, i) => ({
-        id: String(i),
-        title: phrases[i],
-        url: `/path/${i}`,
-        embeddings: result,
-      }));
-
-      const input = { embeddings: data };
-      console.log("Indexing", input);
-
-      setIndex(voy.index(input));
+      const m = await TextModel.create(modelName);
+      setModel(m.model);                      // TextModel.create returns { model }
     })();
-  }, [voy, model]);
+  }, [model]);
 
+  /* ------------------------------------------------------------------ */
+  /*  2)  BUILD THE VOY INDEX AS SOON AS BOTH MODEL + VOY ARE READY     */
+  /* ------------------------------------------------------------------ */
+  useEffect(() => {
+    if (!model || !voy) return;               // wait until both are ready
+
+    (async () => {
+      console.log('Creating embeddings for starter phrases …');
+
+      const docs = await Promise.all(
+        phrases.map(async (text, i) => {
+          const { result } = await model.process(text);      // Float32Array
+          return {
+            id: String(i),
+            title: text,
+            url: `/path/${i}`,
+            embeddings: Array.from(result),  // Voy expects plain JS array
+          };
+        }),
+      );
+
+      voy.index({ embeddings: docs });       // resource shape expected by Voy
+      console.log('Voy index built ✅');
+    })();
+  }, [model, voy]);
+
+  /* ------------------------------------------------------------------ */
+  /*  3)  SEARCH HANDLER                                                */
+  /* ------------------------------------------------------------------ */
   const onSubmit = useCallback(async () => {
-    const query = inputRef.current?.value;
-    if (!query || !index) return;
+    if (!model || !voy) return;
 
-    const q = await model.process(query);
-    const result = voy.search(index, q.result, 4);
+    const query = inputRef.current?.value?.trim();
+    if (!query) return;
 
-    setResults(result.neighbors);
-  }, [index]);
+    const { result } = await model.process(query);
+    const { neighbors } = voy.search(result, 4);   // top-4
+
+    setResults(neighbors);
+  }, [model, voy]);
+
+  /* ------------------------------------------------------------------ */
+  /*  UI                                                                */
+  /* ------------------------------------------------------------------ */
+  const isReady = model && voy;
 
   return (
     <>
       <Head>
-        <title>Voy & Next.js Example - Client Side</title>
+        <title>Voy × Next.js – Client Demo</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
       </Head>
+
       <main>
         <NavigationBar />
 
         <section>
           <code className={styles.example}>
-            {model === null ? (
-              <>Loading model...</>
-            ) : index === null ? (
-              <>Waiting for voy index...</>
+            {!isReady ? (
+              <>Loading {model ? 'Voy' : 'model'} …</>
             ) : (
               <>
-                <span>
-                  {results.map((result, i) => {
-                    return (
+                {results.length > 0 && (
+                  <span>
+                    {results.map((r, i) => (
                       <p
-                        key={i}
+                        key={r.id}
                         className={i === 0 ? styles.primary : styles.secondary}
                       >
-                        {result.title}
+                        {r.title}
                       </p>
-                    );
-                  })}
-                </span>
-                <input type="text" ref={inputRef} />{" "}
+                    ))}
+                  </span>
+                )}
+
+                <input ref={inputRef} type="text" placeholder="Search…" />{' '}
                 <button onClick={onSubmit}>Submit</button>
+
                 <p>Try searching for:</p>
                 <ul>
                   <li>

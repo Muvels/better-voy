@@ -1,17 +1,47 @@
-import { createContext, useContext, PropsWithChildren } from "react";
+'use client';                                   // ① run only in the browser
 
-import * as voy from "voy-search";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  PropsWithChildren,
+} from 'react';
 
-const VoyContext = createContext<typeof voy | null>(null);
+import init, { Voy } from 'voy-search';
 
-export const useVoy = () => {
-  const context = useContext(VoyContext);
-  if (context === null) {
-    throw new Error("useVoy must be used within a VoyProvider");
-  }
-  return context;
-};
+const VoyContext = createContext<Voy | null>(null);
 
 export const VoyProvider = ({ children }: PropsWithChildren) => {
-  return <VoyContext.Provider value={voy}>{children}</VoyContext.Provider>;
+  const [voy, setVoy] = useState<Voy | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      // ② download & instantiate the WASM once the component is mounted
+      await init();                               // can also pass a URL here
+      if (cancelled) return;
+
+      const opts = { onSearch: () => console.log('searched') };
+      setVoy(new Voy(undefined, opts));
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
+  // optional loading UI while the .wasm file is streaming in
+  if (!voy) return null;
+
+  return (
+    <VoyContext.Provider value={voy}>
+      {children}
+    </VoyContext.Provider>
+  );
+};
+
+export const useVoy = () => {
+  const ctx = useContext(VoyContext);
+  if (!ctx) throw new Error('useVoy must be used within a VoyProvider');
+  return ctx;
 };
