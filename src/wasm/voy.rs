@@ -2,18 +2,34 @@ use crate::utils::set_panic_hook;
 use crate::{engine, Neighbor, NumberOfResult, Query, Resource, SearchResult, SerializedIndex};
 
 use js_sys::{Function, Object, Reflect};
+use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
+#[derive(Debug, Clone)]
 pub struct Options {
-    pub on_init: Option<Function>,
-    pub on_index: Option<Function>,
-    pub on_add: Option<Function>,
-    pub on_remove: Option<Function>,
-    pub on_search: Option<Function>,
-    pub on_clear: Option<Function>,
-    pub on_serialize: Option<Function>,
+    pub on_init:        Option<Function>,
+    pub on_index:       Option<Function>,
+    pub on_add:         Option<Function>,
+    pub on_remove:      Option<Function>,
+    pub on_search:      Option<Function>,
+    pub on_clear:       Option<Function>,
+    pub on_serialize:   Option<Function>,
     pub on_deserialize: Option<Function>,
 }
+#[wasm_bindgen(typescript_custom_section)]
+const TS_OPTIONS: &str = r#"
+export interface Options {
+  onInit?:        Function;
+  onIndex?:       Function;
+  onAdd?:         Function;
+  onRemove?:      Function;
+  onSearch?:      Function;
+  onClear?:       Function;
+  onSerialize?:   Function;
+  onDeserialize?: Function;
+}
+"#;
+
 
 /// Convert a JS object (the `options` arg to the constructor / deserialize)
 /// into our strongly‑typed `Options` struct. Any property that cannot be
